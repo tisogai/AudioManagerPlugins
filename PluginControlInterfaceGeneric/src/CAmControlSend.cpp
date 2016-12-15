@@ -636,47 +636,70 @@ am_Error_e CAmControlSend::hookSystemRegisterSink(const am_Sink_s& sinkData, am_
     if (E_OK == mpPolicySend->getListElements(listNames, listSinks))
     {
         /*
-         * over write the configuration data with the dynamic data
+         * Already known sink
+         * 1. If valid classId use it else
+         * 2. use from configuration
          */
-        sinkInfo = listSinks.front();
-        sinkInfo.domainID = sinkData.domainID;
-        sinkInfo.name = sinkData.name;
-        sinkInfo.volume = sinkData.volume;
-        sinkInfo.visible = sinkData.visible;
-        sinkInfo.available = sinkData.available;
-        sinkInfo.listSoundProperties = sinkData.listSoundProperties;
-        sinkInfo.listConnectionFormats = sinkData.listConnectionFormats;
-        sinkInfo.listMainSoundProperties = sinkData.listMainSoundProperties;
-        sinkInfo.listMainNotificationConfigurations = sinkData.listMainNotificationConfigurations;
-        sinkInfo.listNotificationConfigurations = sinkData.listNotificationConfigurations;
-        sinkInfo.sinkID = sinkData.sinkID;
-        sinkInfo.sinkClassID = sinkData.sinkClassID;
-        sinkInfo.muteState = sinkData.muteState;
-        sinkInfo.mainVolume = sinkData.mainVolume;
-        // This sink might have been created during the gateway registration.Please check locally.
-        pElement = CAmSinkFactory::createElement(sinkInfo, mpControlReceive);
-        if (NULL != pElement)
-        {
-            sinkID = pElement->getID();
-            result = E_OK;
-        }
-        else
-        {
-            LOG_FN_INFO(" Not able to create sink element", sinkData.name);
-            result = E_NOT_POSSIBLE;
-        }
-        gc_RegisterElementTrigger_s* registerTrigger = new gc_RegisterElementTrigger_s;
-        if (NULL == registerTrigger)
-        {
-            LOG_FN_ERROR("  bad memory state:");
-            return E_NOT_POSSIBLE;
-        }
-        registerTrigger->elementName = sinkData.name;
-        registerTrigger->RegisterationStatus = result;
-        CAmTriggerQueue::getInstance()->queue(SYSTEM_REGISTER_SINK, registerTrigger);
-        LOG_FN_INFO("  registered sink name:result=", sinkData.name, result);
-
+         CAmClassElement* pClassElement = CAmClassFactory::getElementBySinkClassID(sinkData.sinkClassID);
+         if(pClassElement == NULL)
+         {
+             pClassElement = CAmClassFactory::getElement(sinkInfo.className);
+             sinkInfo.sinkClassID =  pClassElement->getSinkClassID();
+         }
     }
+    else
+    {
+        /**
+         * This source is unknown
+         * 1. If valid class Id proceed
+         * 2. If class Id is invalid use the class Id of the lowest class;
+         */
+        CAmClassElement* pClassElement = CAmClassFactory::getElementBySinkClassID(sinkData.sinkClassID);
+        if(pClassElement == NULL)
+        {
+            CAmClassElement* pClassElement = CAmClassFactory::getElementLowestSinkClassID();
+            sinkInfo.sinkClassID = pClassElement->getSinkClassID();
+        }
+    }
+    /*
+     * over write the configuration data with the dynamic data
+     */
+    sinkInfo = listSinks.front();
+    sinkInfo.domainID = sinkData.domainID;
+    sinkInfo.name = sinkData.name;
+    sinkInfo.volume = sinkData.volume;
+    sinkInfo.visible = sinkData.visible;
+    sinkInfo.available = sinkData.available;
+    sinkInfo.listSoundProperties = sinkData.listSoundProperties;
+    sinkInfo.listConnectionFormats = sinkData.listConnectionFormats;
+    sinkInfo.listMainSoundProperties = sinkData.listMainSoundProperties;
+    sinkInfo.listMainNotificationConfigurations = sinkData.listMainNotificationConfigurations;
+    sinkInfo.listNotificationConfigurations = sinkData.listNotificationConfigurations;
+    sinkInfo.sinkID = sinkData.sinkID;
+    sinkInfo.muteState = sinkData.muteState;
+    sinkInfo.mainVolume = sinkData.mainVolume;
+    // This sink might have been created during the gateway registration.Please check locally.
+    pElement = CAmSinkFactory::createElement(sinkInfo, mpControlReceive);
+    if (NULL != pElement)
+    {
+        sinkID = pElement->getID();
+        result = E_OK;
+    }
+    else
+    {
+        LOG_FN_INFO(" Not able to create sink element", sinkData.name);
+        result = E_NOT_POSSIBLE;
+    }
+    gc_RegisterElementTrigger_s* registerTrigger = new gc_RegisterElementTrigger_s;
+    if (NULL == registerTrigger)
+    {
+        LOG_FN_ERROR("  bad memory state:");
+        return E_NOT_POSSIBLE;
+    }
+    registerTrigger->elementName = sinkData.name;
+    registerTrigger->RegisterationStatus = result;
+    CAmTriggerQueue::getInstance()->queue(SYSTEM_REGISTER_SINK, registerTrigger);
+    LOG_FN_INFO("  registered sink name:result=", sinkData.name, result);
     LOG_FN_EXIT();
     iterateActions();
     return result;
@@ -731,48 +754,74 @@ am_Error_e CAmControlSend::hookSystemRegisterSource(const am_Source_s& sourceDat
     LOG_FN_ENTRY(" source=", sourceData.name);
     listNames.push_back(sourceData.name);
     // First check with the policy engine if this sink is allowed
+
     if (E_OK == mpPolicySend->getListElements(listNames, listSources))
     {
-        sourceInfo = listSources.front();
-        sourceInfo.domainID = sourceData.domainID;
-        sourceInfo.name = sourceData.name;
-        sourceInfo.volume = sourceData.volume;
-        sourceInfo.visible = sourceData.visible;
-        sourceInfo.available = sourceData.available;
-        sourceInfo.listSoundProperties = sourceData.listSoundProperties;
-        sourceInfo.listConnectionFormats = sourceData.listConnectionFormats;
-        sourceInfo.listMainSoundProperties = sourceData.listMainSoundProperties;
-        sourceInfo.listMainNotificationConfigurations = sourceData.listMainNotificationConfigurations;
-        sourceInfo.listNotificationConfigurations = sourceData.listNotificationConfigurations;
-        sourceInfo.sourceID = sourceData.sourceID;
-        sourceInfo.sourceClassID = sourceData.sourceClassID;
-        sourceInfo.sourceState = sourceData.sourceState;
-        sourceInfo.interruptState = sourceData.interruptState;
-
-        // This sink might have been created during the gateway registration.Please check locally.
-        pElement = CAmSourceFactory::createElement(sourceInfo, mpControlReceive);
-        if (NULL != pElement)
-        {
-            sourceID = pElement->getID();
-            result = E_OK;
-        }
-        else
-        {
-            LOG_FN_INFO(" Not able to create source element", sourceData.name);
-            result = E_NOT_POSSIBLE;
-        }
-        gc_RegisterElementTrigger_s* registerTrigger = new gc_RegisterElementTrigger_s;
-        if (NULL == registerTrigger)
-        {
-            LOG_FN_ERROR("  bad memory state:");
-            return E_NOT_POSSIBLE;
-        }
-        registerTrigger->elementName = sourceData.name;
-        registerTrigger->RegisterationStatus = result;
-        CAmTriggerQueue::getInstance()->queue(SYSTEM_REGISTER_SOURCE, registerTrigger);
-        LOG_FN_INFO("  registered source name:result=", sourceData.name, result);
-
+        /*
+         * Already known sink
+         * 1. If valid classId use it else
+         * 2. use from configuration
+         */
+         CAmClassElement* pClassElement = CAmClassFactory::getElementBySourceClassID(sourceData.sourceClassID);
+         if(pClassElement == NULL)
+         {
+             pClassElement = CAmClassFactory::getElement(sourceInfo.className);
+             sourceInfo.sourceClassID = pClassElement->getSinkClassID();
+         }
     }
+    else
+    {
+        /**
+         * This source is unknown
+         * 1. If valid class Id proceed
+         * 2. If class Id is invalid use the class Id of the lowest class;
+         */
+        CAmClassElement* pClassElement = CAmClassFactory::getElementBySourceClassID(sourceData.sourceClassID);
+        if(pClassElement == NULL)
+        {
+            CAmClassElement* pClassElement = CAmClassFactory::getElementLowestSourceClassID();
+            sourceInfo.sourceClassID = pClassElement->getSinkClassID();
+        }
+    }
+
+    sourceInfo = listSources.front();
+    sourceInfo.domainID = sourceData.domainID;
+    sourceInfo.name = sourceData.name;
+    sourceInfo.volume = sourceData.volume;
+    sourceInfo.visible = sourceData.visible;
+    sourceInfo.available = sourceData.available;
+    sourceInfo.listSoundProperties = sourceData.listSoundProperties;
+    sourceInfo.listConnectionFormats = sourceData.listConnectionFormats;
+    sourceInfo.listMainSoundProperties = sourceData.listMainSoundProperties;
+    sourceInfo.listMainNotificationConfigurations = sourceData.listMainNotificationConfigurations;
+    sourceInfo.listNotificationConfigurations = sourceData.listNotificationConfigurations;
+    sourceInfo.sourceID = sourceData.sourceID;
+    sourceInfo.sourceState = sourceData.sourceState;
+    sourceInfo.interruptState = sourceData.interruptState;
+
+    // This sink might have been created during the gateway registration.Please check locally.
+    pElement = CAmSourceFactory::createElement(sourceInfo, mpControlReceive);
+    if (NULL != pElement)
+    {
+        sourceID = pElement->getID();
+        result = E_OK;
+    }
+    else
+    {
+        LOG_FN_INFO(" Not able to create source element", sourceData.name);
+        result = E_NOT_POSSIBLE;
+    }
+    gc_RegisterElementTrigger_s* registerTrigger = new gc_RegisterElementTrigger_s;
+    if (NULL == registerTrigger)
+    {
+        LOG_FN_ERROR("  bad memory state:");
+        return E_NOT_POSSIBLE;
+    }
+    registerTrigger->elementName = sourceData.name;
+    registerTrigger->RegisterationStatus = result;
+    CAmTriggerQueue::getInstance()->queue(SYSTEM_REGISTER_SOURCE, registerTrigger);
+    LOG_FN_INFO("  registered source name:result=", sourceData.name, result);
+
     LOG_FN_EXIT();
     iterateActions();
     return result;

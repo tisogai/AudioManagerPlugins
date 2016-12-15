@@ -135,6 +135,9 @@ public:
     void pushMainConnectionInQueue(CAmMainConnectionElement* pConnection);
 
     am_MuteState_e getMuteState() const;
+    am_sourceID_t getSourceClassID(void) const;
+    am_sinkID_t getSinkClassID(void) const;
+
 protected:
     am_Error_e _register(void);
     am_Error_e _unregister(void);
@@ -155,17 +158,14 @@ private:
 
     // list of main connections of this class
     std::vector<CAmMainConnectionElement* > mListMainConnections;
-    // map to store source element pointer belonging to this class
-    std::vector<std::string > mListOwnedSourceElements;
-    // map to store sink element pointer belonging to this class
-    std::vector<std::string > mListOwnedSinkElements;
-    // map to store gateway element pointer belonging to this class
-    std::vector<std::string > mListOwnedGatewayElements;
     // list to store the limit volume information
     std::map<uint32_t, gc_LimitVolume_s > mMapLimitVolumes;
 
     CAmControlReceive* mpControlReceive;
     gc_Class_s mClass;
+    am_sourceClass_t mSourceClassID;
+    am_sinkClass_t mSinkClassID;
+
 };
 
 class CAmClassFactory : public CAmFactory<gc_Class_s, CAmClassElement >
@@ -173,6 +173,10 @@ class CAmClassFactory : public CAmFactory<gc_Class_s, CAmClassElement >
 public:
     using CAmFactory<gc_Class_s, CAmClassElement >::getElement;
     static CAmClassElement* getElement(const std::string sourceName, const std::string sinkName);
+    static CAmClassElement* getElementBySourceClassID(const am_sourceClass_t sourceClassID);
+    static CAmClassElement* getElementBySinkClassID(const am_sinkClass_t sinkClassID);
+    static CAmClassElement* getElementLowestSourceClassID();
+    static CAmClassElement* getElementLowestSinkClassID();
     static void getElementsBySource(const std::string sourceName,
                                     std::vector<CAmClassElement* >& listClasses);
     static void getElementsBySink(const std::string sinkName,

@@ -473,5 +473,16 @@ am_Error_e CAmSourceElement::getMainNotificationConfigurations(
     return result;
 }
 
+am_sourceClass_t CAmSourceElement::getClassID(void) const
+{
+    am_sourceClass_t classId = 0;
+    am_Source_s source;
+    if (E_OK == mpControlReceive->getSourceInfoDB(getID(), source))
+    {
+        classId = source.sourceClassID;
+    }
+    return classId;
+}
+
 } /* namespace gc */
 } /* namespace am */

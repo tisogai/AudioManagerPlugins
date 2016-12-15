@@ -33,25 +33,10 @@ namespace gc {
 CAmClassElement::CAmClassElement(const gc_Class_s& gcClass, CAmControlReceive* pControlReceive) :
                                 CAmElement(gcClass.name, pControlReceive),
                                 mpControlReceive(pControlReceive),
-                                mClass(gcClass)
+                                mClass(gcClass),
+                                mSourceClassID(0),
+                                mSinkClassID(0)
 {
-    std::vector<gc_TopologyElement_s >::iterator itListTopologyElements;
-    for (itListTopologyElements = mClass.listTopologies.begin();
-                    itListTopologyElements != mClass.listTopologies.end(); ++itListTopologyElements)
-    {
-        if ((*itListTopologyElements).codeID == MC_SINK_ELEMENT)
-        {
-            mListOwnedSinkElements.push_back((*itListTopologyElements).name);
-        }
-        if ((*itListTopologyElements).codeID == MC_SOURCE_ELEMENT)
-        {
-            mListOwnedSourceElements.push_back((*itListTopologyElements).name);
-        }
-        if ((*itListTopologyElements).codeID == MC_GATEWAY_ELEMENT)
-        {
-            mListOwnedGatewayElements.push_back((*itListTopologyElements).name);
-        }
-    }
 }
 
 CAmClassElement::~CAmClassElement()
@@ -61,7 +46,15 @@ CAmClassElement::~CAmClassElement()
 bool CAmClassElement::isSourceSinkPairBelongtoClass(const std::string& sinkName,
                                                     const std::string& sourceName)
 {
-    return (isSourceBelongtoClass(sourceName) && isSinkBelongtoClass(sinkName));
+    bool isSourceBelongingToClass = isSourceBelongtoClass(sourceName);
+    bool isSinkBelongingToClass = isSinkBelongtoClass(sinkName);
+    if (((true == isSourceBelongingToClass) && (true == isSinkBelongingToClass)) ||
+       ((true  == isSourceBelongingToClass)  && (mClass.type == C_PLAYBACK)) ||
+       ((true == isSinkBelongingToClass) && (mClass.type == C_CAPTURE)))
+    {
+        return true;
+    }
+    return false;
 }
 
 void CAmClassElement::disposeConnection(const am_mainConnectionID_t mainConnectionID)
@@ -209,7 +202,7 @@ am_Error_e CAmClassElement::createMainConnection(const std::string& sourceName,
          */
         result = mpControlReceive->getRoute(false, pSourceElement->getID(), pSinkElement->getID(),
                                             listRoutes);
-        if (result != E_OK)
+        if ((result != E_OK) || (listRoutes.empty()== true))
         {
             LOG_FN_ERROR("getting route list from daemon failed");
         }
@@ -218,7 +211,17 @@ am_Error_e CAmClassElement::createMainConnection(const std::string& sourceName,
             result = _getRoute(sourceName, sinkName, route);
             if (result != E_OK)
             {
-                LOG_FN_ERROR(getName(), "failed to get route");
+                LOG_FN_INFO(getName(), "failed to get route from topology, using route from AM DB");
+                /*
+                 * Preferred route not found from topology could be unknown source or sink !! select
+                 * the first route from daemon.
+                 */
+                route.sinkID = listRoutes.begin()->sinkID;
+                route.sourceID = listRoutes.begin()->sourceID;
+                route.route = listRoutes.begin()->route;
+                route.name = sourceName + ":" + sinkName;
+                result = E_OK;
+
             }
             else
             {
@@ -561,6 +564,8 @@ am_Error_e CAmClassElement::_register(void)
         LOG_FN_ERROR(" Error while registering source Class");
         return E_DATABASE_ERROR;
     }
+    mSinkClassID = sinkClassInstance.sinkClassID;
+    mSourceClassID  = sourceClassInstance.sourceClassID;
     return E_OK;
 
 }
@@ -578,22 +583,31 @@ am_Error_e CAmClassElement::_unregister(void)
     return E_OK;
 }
 	
-	bool CAmClassElement::isSourceBelongtoClass(const std::string& sourceName)
+bool CAmClassElement::isSourceBelongtoClass(const std::string& sourceName)
 {
-    std::vector<std::string >::iterator itListOwnedSourceElements;
-    //check if source belong to this class element
-    itListOwnedSourceElements = find(mListOwnedSourceElements.begin(),
-                                     mListOwnedSourceElements.end(), sourceName);
-    return (itListOwnedSourceElements != mListOwnedSourceElements.end());
+    bool returnValue = false;
+    CAmSourceElement* pSourceElement = CAmSourceFactory::getElement(sourceName);
+    if (pSourceElement != NULL)
+    {
+        if (pSourceElement->getClassID() == mSourceClassID)
+        {
+            returnValue = true;
+        }
+    }
+    return returnValue;
 }
 bool CAmClassElement::isSinkBelongtoClass(const std::string& sinkName)
 {
-    std::vector<std::string >::iterator itListOwnedSinkElements;
-    //check if source belong to this class element
-    itListOwnedSinkElements = find(mListOwnedSinkElements.begin(), mListOwnedSinkElements.end(),
-                                   sinkName);
-    return (itListOwnedSinkElements != mListOwnedSinkElements.end());
-
+    bool returnValue = false;
+    CAmSinkElement* pSinkElement = CAmSinkFactory::getElement(sinkName);
+    if (pSinkElement != NULL)
+    {
+        if (pSinkElement->getClassID() == mSinkClassID)
+        {
+            returnValue = true;
+        }
+    }
+    return returnValue;
 }
 
 CAmClassElement* CAmClassFactory::getElement(const std::string sourceName,
@@ -614,6 +628,7 @@ CAmClassElement* CAmClassFactory::getElement(const std::string sourceName,
     return pClassElement;
 }
 
+
 void CAmClassFactory::getElementsBySource(const std::string sourceName,
                                           std::vector<CAmClassElement* >& listClasses)
 {
@@ -628,6 +643,100 @@ void CAmClassFactory::getElementsBySource(const std::string sourceName,
             listClasses.push_back(*itListElements);
         }
     }
+}
+
+am_sourceID_t CAmClassElement::getSourceClassID(void) const
+{
+    return mSourceClassID;
+}
+
+am_sinkID_t CAmClassElement::getSinkClassID(void) const
+{
+    return mSinkClassID;
+}
+
+CAmClassElement* CAmClassFactory::getElementBySourceClassID(const am_sourceClass_t sourceClassID)
+{
+    CAmClassElement* pclassElement = NULL;
+    std::vector<CAmClassElement* > listElements;
+    std::vector<CAmClassElement* >::iterator itListElements;
+    getListElements(listElements);
+    for (itListElements = listElements.begin(); itListElements != listElements.end();
+                    ++itListElements)
+    {
+        if ((*itListElements)->getSourceClassID() == sourceClassID)
+        {
+            pclassElement = (*itListElements);
+            break;
+        }
+    }
+    return pclassElement;
+}
+
+CAmClassElement* CAmClassFactory::getElementBySinkClassID(const am_sinkClass_t sinkClassID)
+{
+    CAmClassElement* pclassElement = NULL;
+    std::vector<CAmClassElement* > listElements;
+    std::vector<CAmClassElement* >::iterator itListElements;
+    getListElements(listElements);
+    for (itListElements = listElements.begin(); itListElements != listElements.end();
+                    ++itListElements)
+    {
+        if ((*itListElements)->getSinkClassID() == sinkClassID)
+        {
+            pclassElement = (*itListElements);
+             break;
+        }
+    }
+    return pclassElement;
+}
+
+CAmClassElement* CAmClassFactory::getElementLowestSinkClassID(void)
+{
+    CAmClassElement* pclassElement = NULL;
+    /*
+     * Need to replace with limits
+     */
+    am_sinkClass_t classID = 65535;
+    am_sinkClass_t minClassID = 65535;
+    std::vector<CAmClassElement* > listElements;
+    std::vector<CAmClassElement* >::iterator itListElements;
+    getListElements(listElements);
+    for (itListElements = listElements.begin(); itListElements != listElements.end();
+                    ++itListElements)
+    {
+        classID = (*itListElements)->getSinkClassID();
+        if (classID < minClassID)
+        {
+            pclassElement = (*itListElements);
+            minClassID = classID;
+        }
+    }
+    return pclassElement;
+}
+
+CAmClassElement* CAmClassFactory::getElementLowestSourceClassID(void)
+{
+    CAmClassElement* pclassElement = NULL;
+    /*
+     * Need to replace with limits
+     */
+    am_sourceClass_t classID = 65535;
+    am_sourceClass_t minClassID = 65535;
+    std::vector<CAmClassElement* > listElements;
+    std::vector<CAmClassElement* >::iterator itListElements;
+    getListElements(listElements);
+    for (itListElements = listElements.begin(); itListElements != listElements.end();
+                    ++itListElements)
+    {
+        classID = (*itListElements)->getSourceClassID();
+        if (classID < minClassID)
+        {
+            pclassElement = (*itListElements);
+            minClassID = classID;
+        }
+    }
+    return pclassElement;
 }
 
 void CAmClassFactory::getElementsBySink(const std::string sinkName,
