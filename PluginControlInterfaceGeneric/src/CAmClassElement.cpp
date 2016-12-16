@@ -26,7 +26,6 @@
 #include "CAmLogger.h"
 #include "CAmSinkElement.h"
 #include "CAmSourceElement.h"
-#include "climits"
 
 namespace am {
 namespace gc {
