@@ -210,6 +210,7 @@ public:
 
     void setInUse(const bool inUse);
     uint16_t getInUse(void) const;
+    am_sinkClass_t getClassID(void) const;
 protected:
     am_Error_e _register(void);
     am_Error_e _unregister(void);

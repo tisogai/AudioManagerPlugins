@@ -695,5 +695,17 @@ am_Error_e CAmSinkElement::getMainNotificationConfigurations(
     return result;
 }
 
+am_sinkClass_t CAmSinkElement::getClassID(void) const
+{
+    am_sinkClass_t classId = 0;
+    am_Sink_s sink;
+    if (E_OK == mpControlReceive->getSinkInfoDB(getID(), sink))
+    {
+        classId = sink.sinkClassID;
+    }
+    return classId;
+}
+
+
 } /* namespace gc */
 } /* namespace am */
