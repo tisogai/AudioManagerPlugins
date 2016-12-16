@@ -26,6 +26,7 @@
 #include "CAmLogger.h"
 #include "CAmSinkElement.h"
 #include "CAmSourceElement.h"
+#include "climits"
 
 namespace am {
 namespace gc {
@@ -216,12 +217,18 @@ am_Error_e CAmClassElement::createMainConnection(const std::string& sourceName,
                  * Preferred route not found from topology could be unknown source or sink !! select
                  * the first route from daemon.
                  */
-                route.sinkID = listRoutes.begin()->sinkID;
-                route.sourceID = listRoutes.begin()->sourceID;
-                route.route = listRoutes.begin()->route;
-                route.name = sourceName + ":" + sinkName;
-                result = E_OK;
-
+                if(listRoutes.empty() == false)
+                {
+                    route.sinkID = listRoutes.begin()->sinkID;
+                    route.sourceID = listRoutes.begin()->sourceID;
+                    route.route = listRoutes.begin()->route;
+                    route.name = sourceName + ":" + sinkName;
+                    result = E_OK;
+                }
+                else
+                {
+                    LOG_FN_INFO(getName(), "AM route list is empty");
+                }
             }
             else
             {
@@ -694,11 +701,8 @@ CAmClassElement* CAmClassFactory::getElementBySinkClassID(const am_sinkClass_t s
 CAmClassElement* CAmClassFactory::getElementLowestSinkClassID(void)
 {
     CAmClassElement* pclassElement = NULL;
-    /*
-     * Need to replace with limits
-     */
-    am_sinkClass_t classID = 65535;
-    am_sinkClass_t minClassID = 65535;
+    am_sinkClass_t classID = 0;
+    am_sinkClass_t minClassID = 0;
     std::vector<CAmClassElement* > listElements;
     std::vector<CAmClassElement* >::iterator itListElements;
     getListElements(listElements);
@@ -706,7 +710,7 @@ CAmClassElement* CAmClassFactory::getElementLowestSinkClassID(void)
                     ++itListElements)
     {
         classID = (*itListElements)->getSinkClassID();
-        if (classID < minClassID)
+        if ((classID < minClassID) || (minClassID == 0))
         {
             pclassElement = (*itListElements);
             minClassID = classID;
@@ -718,11 +722,8 @@ CAmClassElement* CAmClassFactory::getElementLowestSinkClassID(void)
 CAmClassElement* CAmClassFactory::getElementLowestSourceClassID(void)
 {
     CAmClassElement* pclassElement = NULL;
-    /*
-     * Need to replace with limits
-     */
-    am_sourceClass_t classID = 65535;
-    am_sourceClass_t minClassID = 65535;
+    am_sourceClass_t classID = 0;
+    am_sourceClass_t minClassID = 0;
     std::vector<CAmClassElement* > listElements;
     std::vector<CAmClassElement* >::iterator itListElements;
     getListElements(listElements);
@@ -730,7 +731,7 @@ CAmClassElement* CAmClassFactory::getElementLowestSourceClassID(void)
                     ++itListElements)
     {
         classID = (*itListElements)->getSourceClassID();
-        if (classID < minClassID)
+        if ((classID < minClassID) || (minClassID == 0))
         {
             pclassElement = (*itListElements);
             minClassID = classID;
