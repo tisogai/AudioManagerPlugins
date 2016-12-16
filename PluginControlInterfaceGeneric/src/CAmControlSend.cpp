@@ -629,22 +629,22 @@ am_Error_e CAmControlSend::hookSystemRegisterSink(const am_Sink_s& sinkData, am_
     std::vector < gc_Sink_s > listSinks;
     std::vector < std::string > listNames;
     gc_Sink_s sinkInfo;
-
+    CAmClassElement* pClassElement;
     listNames.push_back(sinkData.name);
     LOG_FN_ENTRY(" sink=", sinkData.name);
     // First check with the policy engine if this sink is allowed
     if (E_OK == mpPolicySend->getListElements(listNames, listSinks))
     {
+        sinkInfo = listSinks.front();
         /*
          * Already known sink
          * 1. If valid classId use it else
          * 2. use from configuration
          */
-         CAmClassElement* pClassElement = CAmClassFactory::getElementBySinkClassID(sinkData.sinkClassID);
+         pClassElement = CAmClassFactory::getElementBySinkClassID(sinkData.sinkClassID);
          if(pClassElement == NULL)
          {
              pClassElement = CAmClassFactory::getElement(sinkInfo.className);
-             sinkInfo.sinkClassID =  pClassElement->getSinkClassID();
          }
     }
     else
@@ -654,17 +654,16 @@ am_Error_e CAmControlSend::hookSystemRegisterSink(const am_Sink_s& sinkData, am_
          * 1. If valid class Id proceed
          * 2. If class Id is invalid use the class Id of the lowest class;
          */
-        CAmClassElement* pClassElement = CAmClassFactory::getElementBySinkClassID(sinkData.sinkClassID);
-        if(pClassElement == NULL)
-        {
-            CAmClassElement* pClassElement = CAmClassFactory::getElementLowestSinkClassID();
-            sinkInfo.sinkClassID = pClassElement->getSinkClassID();
-        }
+        pClassElement = CAmClassFactory::getElementBySinkClassID(sinkData.sinkClassID);
     }
+    if(pClassElement == NULL)
+    {
+        pClassElement = CAmClassFactory::getElementLowestSinkClassID();
+    }
+    sinkInfo.sinkClassID = pClassElement->getSinkClassID();
     /*
      * over write the configuration data with the dynamic data
      */
-    sinkInfo = listSinks.front();
     sinkInfo.domainID = sinkData.domainID;
     sinkInfo.name = sinkData.name;
     sinkInfo.volume = sinkData.volume;
@@ -749,6 +748,7 @@ am_Error_e CAmControlSend::hookSystemRegisterSource(const am_Source_s& sourceDat
     am_Error_e result = E_NOT_POSSIBLE;
     CAmElement* pElement;
     gc_Source_s sourceInfo;
+    CAmClassElement* pClassElement;
     std::vector < gc_Source_s > listSources;
     std::vector < std::string > listNames;
     LOG_FN_ENTRY(" source=", sourceData.name);
@@ -762,11 +762,11 @@ am_Error_e CAmControlSend::hookSystemRegisterSource(const am_Source_s& sourceDat
          * 1. If valid classId use it else
          * 2. use from configuration
          */
-         CAmClassElement* pClassElement = CAmClassFactory::getElementBySourceClassID(sourceData.sourceClassID);
+         sourceInfo = listSources.front();
+         pClassElement = CAmClassFactory::getElementBySourceClassID(sourceData.sourceClassID);
          if(pClassElement == NULL)
          {
              pClassElement = CAmClassFactory::getElement(sourceInfo.className);
-             sourceInfo.sourceClassID = pClassElement->getSinkClassID();
          }
     }
     else
@@ -776,15 +776,13 @@ am_Error_e CAmControlSend::hookSystemRegisterSource(const am_Source_s& sourceDat
          * 1. If valid class Id proceed
          * 2. If class Id is invalid use the class Id of the lowest class;
          */
-        CAmClassElement* pClassElement = CAmClassFactory::getElementBySourceClassID(sourceData.sourceClassID);
-        if(pClassElement == NULL)
-        {
-            CAmClassElement* pClassElement = CAmClassFactory::getElementLowestSourceClassID();
-            sourceInfo.sourceClassID = pClassElement->getSinkClassID();
-        }
+        pClassElement = CAmClassFactory::getElementBySourceClassID(sourceData.sourceClassID);
     }
-
-    sourceInfo = listSources.front();
+    if(pClassElement == NULL)
+    {
+        pClassElement = CAmClassFactory::getElementLowestSourceClassID();
+    }
+    sourceInfo.sourceClassID = pClassElement->getSinkClassID();
     sourceInfo.domainID = sourceData.domainID;
     sourceInfo.name = sourceData.name;
     sourceInfo.volume = sourceData.volume;
